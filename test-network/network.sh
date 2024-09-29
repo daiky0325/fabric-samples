@@ -219,7 +219,7 @@ function createOrgs() {
 
   fi 
 
-  # Create crypto material using Fabric CA
+  # Create crypto material using Fabric CA　
   if [ "$CRYPTO" == "Certificate Authorities" ]; then
     infoln "Generating certificates using Fabric CA"
     ${CONTAINER_CLI_COMPOSE} -f compose/$COMPOSE_FILE_CA -f compose/$CONTAINER_CLI/${CONTAINER_CLI}-$COMPOSE_FILE_CA up -d 2>&1
