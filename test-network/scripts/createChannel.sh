@@ -73,7 +73,7 @@ createChannel() {
 joinChannel() {
   ORG=$1
   FABRIC_CFG_PATH=$PWD/../config/
-  setGlobals $ORG
+  setGlobals $ORG #enVar.shに存在する。
 	local rc=1
 	local COUNTER=1
 	## Sometimes Join takes time, hence retry
@@ -118,7 +118,7 @@ infoln "Creating channel ${CHANNEL_NAME}"
 createChannel $BFT
 successln "Channel '$CHANNEL_NAME' created"
 
-## Join all the peers to the channel
+## Join all the peers to the channel ここでチャネルに入る入らないを制御している
 infoln "Joining org1 peer to the channel..."
 joinChannel 1
 infoln "Joining org2 peer to the channel..."

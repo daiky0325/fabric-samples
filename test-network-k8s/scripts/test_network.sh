@@ -125,7 +125,7 @@ function create_local_MSP() {
   pop_fn
 }
 
-function network_up() {
+function network_up() { #ネットワーク構築
 
   # Kube config
   init_namespace
