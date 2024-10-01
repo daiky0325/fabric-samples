@@ -18,6 +18,7 @@ println "- CC_VERSION: ${C_GREEN}${CC_VERSION}${C_RESET}"
 
 FABRIC_CFG_PATH=$PWD/../config/
 
+#ここでチェーンコードファイルを変更している。
 #User has not provided a name
 if [ -z "$CC_NAME" ] || [ "$CC_NAME" = "NA" ]; then
   fatalln "No chaincode name was provided. Valid call example: ./network.sh packageCC -ccn basic -ccp chaincode/asset-transfer-basic/chaincode-go -ccv 1.0 -ccl go"

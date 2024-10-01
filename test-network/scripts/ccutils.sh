@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# installChaincode PEER ORG
+# installChaincode PEER ORG チェーンコードをインストールするときはここを変更。
 function installChaincode() {
   ORG=$1
   setGlobals $ORG

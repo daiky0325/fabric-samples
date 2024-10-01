@@ -284,7 +284,7 @@ function networkUp() {
 
   checkPrereqs
 
-  # generate artifacts if they don't exist
+  # 証明証がないとき勝手に作る
   if [ ! -d "organizations/peerOrganizations" ]; then
     createOrgs
   fi
