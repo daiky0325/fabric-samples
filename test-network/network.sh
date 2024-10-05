@@ -301,7 +301,7 @@ function networkUp() {
   # 証明証がないとき勝手に作る
   if [ ! -d "organizations/peerOrganizations" ]; then
     createOrgs
-  fi
+ fi 
 
   COMPOSE_FILES="-f compose/${COMPOSE_FILE_BASE} -f compose/${CONTAINER_CLI}/${CONTAINER_CLI}-${COMPOSE_FILE_BASE}"
 
