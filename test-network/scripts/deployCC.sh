@@ -14,6 +14,7 @@ CC_COLL_CONFIG=${9:-"NA"}
 DELAY=${10:-"3"}
 MAX_RETRY=${11:-"5"}
 VERBOSE=${12:-"false"}
+CHANNEL_ORG=${13:-0}
 
 println "executing with the following"
 println "- CHANNEL_NAME: ${C_GREEN}${CHANNEL_NAME}${C_RESET}"
@@ -73,6 +74,8 @@ checkPrereqs
 
 PACKAGE_ID=$(peer lifecycle chaincode calculatepackageid ${CC_NAME}.tar.gz)
 
+if [ $CHANNEL_ORG -eq 0 ];then
+
 ## Install chaincode on peer0.org1 and peer0.org2
 infoln "Installing chaincode on peer0.org1..."
 installChaincode 1
@@ -112,6 +115,16 @@ queryCommitted 1
 queryCommitted 2
 queryCommitted 3
 
+else
+installOrganizationChaincode $CHANNEL_ORG 0
+installOrganizationChaincode $CHANNEL_ORG 1
+installOrganizationChaincode $CHANNEL_ORG 2
+installOrganizationChaincode $CHANNEL_ORG 3
+resolveSequence
+#代表するピア一つのみ
+approveForMyOrg $CHANNEL_ORG
+commitChaincodeDefinition $CHANNEL_ORG
+fi
 ## Invoke the chaincode - this does require that the chaincode have the 'initLedger'
 ## method defined
 if [ "$CC_INIT_FCN" = "NA" ]; then

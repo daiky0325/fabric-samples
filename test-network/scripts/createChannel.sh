@@ -8,11 +8,14 @@ DELAY="$2"
 MAX_RETRY="$3"
 VERBOSE="$4"
 BFT="$5"
+CHANNEL_ORG=$6
+
 : ${CHANNEL_NAME:="mychannel"}
 : ${DELAY:="3"}
 : ${MAX_RETRY:="5"}
 : ${VERBOSE:="false"}
 : ${BFT:=0}
+: ${CHANNEL_ORG:=0}
 
 : ${CONTAINER_CLI:="docker"}
 if command -v ${CONTAINER_CLI}-compose > /dev/null 2>&1; then
@@ -90,6 +93,36 @@ joinChannel() {
 	verifyResult $res "After $MAX_RETRY attempts, peer0.org${ORG} has failed to join channel '$CHANNEL_NAME' "
 }
 
+joinOrganizationChannel() {
+  ORG=$1
+  PEER=$2
+  FABRIC_CFG_PATH=$PWD/../config/
+  setGlobals $ORG # enVar.shに存在する。
+  local base_port=7051
+  local port=$(( base_port + (ORG - 1) * 2000 + PEER * 10 ))  
+  # 計算されたポート番号を設定
+    export CORE_PEER_ADDRESS=localhost:$port
+    echo $CORE_PEER_ADDRESS
+    local rc=1
+    local COUNTER=1
+
+    ## リトライ処理
+    while [ $rc -ne 0 -a $COUNTER -lt $MAX_RETRY ]; do
+      sleep $DELAY
+      set -x
+      peer channel join -b $BLOCKFILE >&log.txt
+      res=$?
+      { set +x; } 2>/dev/null
+      let rc=$res
+      COUNTER=$((COUNTER + 1))
+    done
+    cat log.txt
+
+  verifyResult $res "After $MAX_RETRY attempts, peer0.org${ORG} has failed to join channel '$CHANNEL_NAME'"
+}
+
+
+
 setAnchorPeer() {
   ORG=$1
   . scripts/setAnchorPeer.sh $ORG $CHANNEL_NAME 
@@ -117,21 +150,30 @@ createChannelGenesisBlock $BFT
 infoln "Creating channel ${CHANNEL_NAME}"
 createChannel $BFT
 successln "Channel '$CHANNEL_NAME' created"
+if [ $CHANNEL_ORG -eq 0 ];then
+  ## Join all the peers to the channel ここでチャネルに入る入らないを制御している
+  infoln "Joining org1 peer to the channel..."
+  joinChannel 1
+  infoln "Joining org2 peer to the channel..."
+  joinChannel 2
+  infoln "Joining org3 peer to the channel..."
+  joinChannel 3
 
-## Join all the peers to the channel ここでチャネルに入る入らないを制御している
-infoln "Joining org1 peer to the channel..."
-joinChannel 1
-infoln "Joining org2 peer to the channel..."
-joinChannel 2
-infoln "Joining org3 peer to the channel..."
-joinChannel 3
-
-## Set the anchor peers for each org in the channel
-infoln "Setting anchor peer for org1..."
-setAnchorPeer 1
-infoln "Setting anchor peer for org2..."
-setAnchorPeer 2
-infoln "Setting anchor peer for org3..."
-setAnchorPeer 3
+  ## Set the anchor peers for each org in the channel
+  infoln "Setting anchor peer for org1..."
+  setAnchorPeer 1
+  infoln "Setting anchor peer for org2..."
+  setAnchorPeer 2
+  infoln "Setting anchor peer for org3..."
+  setAnchorPeer 3
+else
+  infoln "Setting  for org$CHANNEL_ORG..."
+  joinOrganizationChannel $CHANNEL_ORG 0
+  joinOrganizationChannel $CHANNEL_ORG 1
+  joinOrganizationChannel $CHANNEL_ORG 2
+  joinOrganizationChannel $CHANNEL_ORG 3
+ 
+  setAnchorPeer $CHANNEL_ORG 
+fi
 
 successln "Channel '$CHANNEL_NAME' joined"

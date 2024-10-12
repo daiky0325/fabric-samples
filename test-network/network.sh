@@ -347,13 +347,13 @@ function createChannel() {
 
   # now run the script that creates a channel. This script uses configtxgen once
   # to create the channel creation transaction and the anchor peer updates.
-  scripts/createChannel.sh $CHANNEL_NAME $CLI_DELAY $MAX_RETRY $VERBOSE $bft_true
+  scripts/createChannel.sh $CHANNEL_NAME $CLI_DELAY $MAX_RETRY $VERBOSE $bft_true $CHANNEL_ORG
 }
 
 
 ## Call the script to deploy a chaincode to the channel
 function deployCC() {
-  scripts/deployCC.sh $CHANNEL_NAME $CC_NAME $CC_SRC_PATH $CC_SRC_LANGUAGE $CC_VERSION $CC_SEQUENCE $CC_INIT_FCN $CC_END_POLICY $CC_COLL_CONFIG $CLI_DELAY $MAX_RETRY $VERBOSE
+  scripts/deployCC.sh $CHANNEL_NAME $CC_NAME $CC_SRC_PATH $CC_SRC_LANGUAGE $CC_VERSION $CC_SEQUENCE $CC_INIT_FCN $CC_END_POLICY $CC_COLL_CONFIG $CLI_DELAY $MAX_RETRY $VERBOSE $CHANNEL_ORG
 
   if [ $? -ne 0 ]; then
     fatalln "Deploying chaincode failed"
@@ -476,7 +476,7 @@ function networkDown() {
 
 . ./network.config
 
-# use this as the default docker-compose yaml definition
+# use this as the defdeault docker-compose yaml definition
 COMPOSE_FILE_BASE=compose-test-net.yaml
 # docker-compose.yaml file if you are using couchdb
 COMPOSE_FILE_COUCH=compose-couch.yaml
@@ -542,6 +542,10 @@ while [[ $# -ge 1 ]] ; do
     ;;
   -c )
     CHANNEL_NAME="$2"
+    shift
+    ;;
+  -org )
+    CHANNEL_ORG="$2"
     shift
     ;;
   -bft )
