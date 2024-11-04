@@ -1,83 +1,138 @@
 /*
-* Copyright IBM Corp. All Rights Reserved.
-*
-* SPDX-License-Identifier: Apache-2.0
-*/
+ * Copyright IBM Corp. All Rights Reserved.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 import * as grpc from '@grpc/grpc-js';
-import { connect, Contract, Identity, Signer, signers } from '@hyperledger/fabric-gateway';
+import {
+    connect,
+    Contract,
+    Identity,
+    Signer,
+    signers,
+} from '@hyperledger/fabric-gateway';
 import * as crypto from 'crypto';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import { TextDecoder } from 'util';
+import express from 'express';
+const PORT = 3000;
 
-    
-async function main(): Promise<void> {     
-    await setupOrg(1);  
-    await setupOrg(2);  
-    await setupOrg(3);  
-}
-interface Asset{
-    ID:             string,
-    Color:          string,
-    Size:           number,
-    Owner:          string,
-    AppraisedValue: number,
+const app = express();
+
+interface Asset {
+    ID: string;
+    Color: string;
+    Size: number;
+    Owner: string;
+    AppraisedValue: number;
 }
 
+// Fabricのセットアップを実
 
-function channelName(org:number) { 
+// Expressサーバーの起動
+async function startServer() {
+    app.listen(PORT, async () => {
+        console.log(`aServer is running on http://localhost:${PORT}`);
+        try {
+            await setupOrg1(); // awaitでsetupOrg1を呼び出す
+            console.log('setupOrg1 completed successfully.');
+        } catch (error) {
+            console.error('Error during setupOrg1:', error);
+        }
+    });
+}
+
+startServer().catch((error) => {
+    console.error('Failed to start the server:', error);
+    process.exit(1);
+});
+
+function channelName(org: number) {
     return envOrDefault('CHANNEL_NAME', `org${org}`);
 }
 
 const chaincodeName = envOrDefault('CHAINCODE_NAME', 'basic');
-const utf8Decoder = new TextDecoder();
-const assetId = `asset${String(Date.now())}`;
-function getMspId (org:number){
+function getMspId(org: number) {
     return envOrDefault('MSP_ID', `Org${org}MSP`);
 }
 
-
 // Path to crypto materials.
-function cryptoPath(org:number){
-    return  path.resolve(__dirname, '..', '..', '..', 'test-network', 'organizations', 'peerOrganizations', `org${org}.example.com`)
+function cryptoPath(org: number) {
+    return path.resolve(
+        __dirname,
+        '..',
+        '..',
+        '..',
+        'test-network',
+        'organizations',
+        'peerOrganizations',
+        `org${org}.example.com`,
+    );
 }
-
 
 // Path to user private key directory.
-function keyDirectoryPath(org:number){
-    return envOrDefault('KEY_DIRECTORY_PATH', path.resolve(cryptoPath(org), 'users', `User1@org${org}.example.com`, 'msp', 'keystore'))
+function keyDirectoryPath(org: number) {
+    return envOrDefault(
+        'KEY_DIRECTORY_PATH',
+        path.resolve(
+            cryptoPath(org),
+            'users',
+            `User1@org${org}.example.com`,
+            'msp',
+            'keystore',
+        ),
+    );
 }
-
 
 // Path to user certificate directory.
 
-function certDirectoryPath(org:number){
-return envOrDefault('CERT_DIRECTORY_PATH', path.resolve(cryptoPath(org), 'users', `User1@org${org}.example.com`, 'msp', 'signcerts'));
+function certDirectoryPath(org: number) {
+    return envOrDefault(
+        'CERT_DIRECTORY_PATH',
+        path.resolve(
+            cryptoPath(org),
+            'users',
+            `User1@org${org}.example.com`,
+            'msp',
+            'signcerts',
+        ),
+    );
 }
 // Path to peer tls certificate.
-function tlsCertPath(org:number){ return  envOrDefault('TLS_CERT_PATH', path.resolve(cryptoPath(org), 'peers', `peer0.org${org}.example.com`, 'tls', 'ca.crt'));
+function tlsCertPath(org: number) {
+    return envOrDefault(
+        'TLS_CERT_PATH',
+        path.resolve(
+            cryptoPath(org),
+            'peers',
+            `peer0.org${org}.example.com`,
+            'tls',
+            'ca.crt',
+        ),
+    );
 }
 // Gateway peer endpoint.
-function peerEndpoint (org:number){
-    const port=(org-1)*2000+7051;
+function peerEndpoint(org: number) {
+    const port = (org - 1) * 2000 + 7051;
     return envOrDefault('PEER_ENDPOINT', `localhost:${port}`);
 }
 
 // Gateway peer SSL host name override.
-function peerHostAlias(org:number) { 
+function peerHostAlias(org: number) {
     return envOrDefault('PEER_HOST_ALIAS', `peer0.org${org}.example.com`);
 }
 
+const utf8Decoder = new TextDecoder();
+const assetId = `asset${String(Date.now())}`;
 
-
-
-
-async function setupOrg(orgNum:number): Promise<void> {
+async function setupOrg1(): Promise<void> {
     // displayInputParameters();
+    const orgNum = 1;
     const client = await newGrpcConnection(orgNum);
 
-    const gateway=connect({
+    const gateway = connect({
         client,
         identity: await newIdentity(orgNum),
         signer: await newSigner(orgNum),
@@ -93,42 +148,46 @@ async function setupOrg(orgNum:number): Promise<void> {
         },
         commitStatusOptions: () => {
             return { deadline: Date.now() + 60000 }; // 1 minute
-        },});
+        },
+    });
 
-        // 5. リスナーを登録する
-        
-        try {
+    // 5. リスナーを登録する
+
+    try {
         const network = gateway.getNetwork(channelName(orgNum));
-        
+
         // Get the smart contract from the network.
         const contract = network.getContract(chaincodeName);
 
         // await contract.
+        console.log('start');
+        const events = await network.getChaincodeEvents(chaincodeName);
 
-        console.log(`${orgNum}スタート`)
-        const events=await network.getChaincodeEvents(chaincodeName)
-        console.log("owari")
+        for await (const event of events) {
+            try {
+                console.log(`Event Name: ${event.blockNumber}`);
 
-    for await (const event of events) {
-    try {
-        console.log(`Event Name: ${event.transactionId}`);
-        
-        // イベントのペイロードをデコード
-        const payload = event.payload;
-        const asset = JSON.parse(new TextDecoder('utf-8').decode(payload)) as Asset;
-        console.log(`Asset ID: ${asset.ID}`);
-        
-        // mychannel の設定・送信
-        const myChannelNetwork = gateway.getNetwork('mychannel');
-        const myChannelContract = myChannelNetwork.getContract(chaincodeName);
-        
-        // アセットを作成
-        await createAsset(myChannelContract, asset);
-        console.log("アセット作成が完了しました");
-    } catch (eventError) {
-        console.error(`イベント処理中にエラーが発生しました: ${eventError}`);
-    }
-}
+                // イベントのペイロードをデコード
+                const payload = event.payload;
+                const asset = JSON.parse(
+                    new TextDecoder('utf-8').decode(payload),
+                ) as Asset;
+                console.log(`Asset ID: ${asset.ID}`);
+
+                // mychannel の設定・送信
+                const myChannelNetwork = gateway.getNetwork('mychannel');
+                const myChannelContract =
+                    myChannelNetwork.getContract(chaincodeName);
+
+                // アセットを作成
+                await createAsset(myChannelContract, asset);
+                console.log('アセット作成が完了しました');
+            } catch (eventError) {
+                console.error(
+                    `イベント処理中にエラーが発生しました: ${eventError}`,
+                );
+            }
+        }
         // Initialize a set of asset data on the ledger using the chaincode 'InitLedger' function.
         await initLedger(contract);
 
@@ -144,22 +203,16 @@ async function setupOrg(orgNum:number): Promise<void> {
         await readAssetByID(contract);
 
         // Update an asset which does not exist.
-        await updateNonExistentAsset(contract)
-    }catch (error) {
+        await updateNonExistentAsset(contract);
+    } catch (error) {
         console.error(`Error listening for events: ${error}`);
-    } 
-    finally{
+    } finally {
         gateway.close();
         client.close();
     }
-    }
+}
 
-main().catch((error: unknown) => {
-    console.error('******** FAILED to run the application:', error);
-    process.exitCode = 1;
-});
-
-async function newGrpcConnection(org:number): Promise<grpc.Client> {
+async function newGrpcConnection(org: number): Promise<grpc.Client> {
     const tlsRootCert = await fs.readFile(tlsCertPath(org));
     const tlsCredentials = grpc.credentials.createSsl(tlsRootCert);
     return new grpc.Client(peerEndpoint(org), tlsCredentials, {
@@ -167,10 +220,10 @@ async function newGrpcConnection(org:number): Promise<grpc.Client> {
     });
 }
 
-async function newIdentity(org:number): Promise<Identity> {
+async function newIdentity(org: number): Promise<Identity> {
     const certPath = await getFirstDirFileName(certDirectoryPath(org));
     const credentials = await fs.readFile(certPath);
-    const mspId=getMspId(org);
+    const mspId = getMspId(org);
     return { mspId, credentials };
 }
 
@@ -183,7 +236,7 @@ async function getFirstDirFileName(dirPath: string): Promise<string> {
     return path.join(dirPath, file);
 }
 
-async function newSigner(org:number): Promise<Signer> {
+async function newSigner(org: number): Promise<Signer> {
     const keyPath = await getFirstDirFileName(keyDirectoryPath(org));
     const privateKeyPem = await fs.readFile(keyPath);
     const privateKey = crypto.createPrivateKey(privateKeyPem);
@@ -195,7 +248,9 @@ async function newSigner(org:number): Promise<Signer> {
  * initial deployment. A new version of the chaincode deployed later would likely not need to run an "init" function.
  */
 async function initLedger(contract: Contract): Promise<void> {
-    console.log('\n--> Submit Transaction: InitLedger, function creates the initial set of assets on the ledger');
+    console.log(
+        '\n--> Submit Transaction: InitLedger, function creates the initial set of assets on the ledger',
+    );
 
     await contract.submitTransaction('InitLedger');
 
@@ -206,7 +261,9 @@ async function initLedger(contract: Contract): Promise<void> {
  * Evaluate a transaction to query ledger state.
  */
 async function getAllAssets(contract: Contract): Promise<void> {
-    console.log('\n--> Evaluate Transaction: GetAllAssets, function returns all the current assets on the ledger');
+    console.log(
+        '\n--> Evaluate Transaction: GetAllAssets, function returns all the current assets on the ledger',
+    );
 
     const resultBytes = await contract.evaluateTransaction('GetAllAssets');
 
@@ -218,8 +275,10 @@ async function getAllAssets(contract: Contract): Promise<void> {
 /**
  * Submit a transaction synchronously, blocking until it has been committed to the ledger.
  */
-async function createAsset(contract: Contract,asset:Asset): Promise<void> {
-    console.log('\n--> Submit Transaction: CreateAsset, creates new asset with ID, Color, Size, Owner and AppraisedValue arguments');
+async function createAsset(contract: Contract, asset: Asset): Promise<void> {
+    console.log(
+        '\n--> Submit Transaction: CreateAsset, creates new asset with ID, Color, Size, Owner and AppraisedValue arguments',
+    );
 
     await contract.submitTransaction(
         'CreateAsset',
@@ -238,28 +297,39 @@ async function createAsset(contract: Contract,asset:Asset): Promise<void> {
  * while waiting for the commit notification.
  */
 async function transferAssetAsync(contract: Contract): Promise<void> {
-    console.log('\n--> Async Submit Transaction: TransferAsset, updates existing asset owner');
+    console.log(
+        '\n--> Async Submit Transaction: TransferAsset, updates existing asset owner',
+    );
 
     const commit = await contract.submitAsync('TransferAsset', {
         arguments: [assetId, 'Saptha'],
     });
     const oldOwner = utf8Decoder.decode(commit.getResult());
 
-    console.log(`*** Successfully submitted transaction to transfer ownership from ${oldOwner} to Saptha`);
+    console.log(
+        `*** Successfully submitted transaction to transfer ownership from ${oldOwner} to Saptha`,
+    );
     console.log('*** Waiting for transaction commit');
 
     const status = await commit.getStatus();
     if (!status.successful) {
-        throw new Error(`Transaction ${status.transactionId} failed to commit with status code ${String(status.code)}`);
+        throw new Error(
+            `Transaction ${status.transactionId} failed to commit with status code ${String(status.code)}`,
+        );
     }
 
     console.log('*** Transaction committed successfully');
 }
 
 async function readAssetByID(contract: Contract): Promise<void> {
-    console.log('\n--> Evaluate Transaction: ReadAsset, function returns asset attributes');
+    console.log(
+        '\n--> Evaluate Transaction: ReadAsset, function returns asset attributes',
+    );
 
-    const resultBytes = await contract.evaluateTransaction('ReadAsset', assetId);
+    const resultBytes = await contract.evaluateTransaction(
+        'ReadAsset',
+        assetId,
+    );
 
     const resultJson = utf8Decoder.decode(resultBytes);
     const result: unknown = JSON.parse(resultJson);
@@ -269,8 +339,10 @@ async function readAssetByID(contract: Contract): Promise<void> {
 /**
  * submitTransaction() will throw an error containing details of any error responses from the smart contract.
  */
-async function updateNonExistentAsset(contract: Contract): Promise<void>{
-    console.log('\n--> Submit Transaction: UpdateAsset asset70, asset70 does not exist and should return an error');
+async function updateNonExistentAsset(contract: Contract): Promise<void> {
+    console.log(
+        '\n--> Submit Transaction: UpdateAsset asset70, asset70 does not exist and should return an error',
+    );
 
     try {
         await contract.submitTransaction(
