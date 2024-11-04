@@ -191,6 +191,9 @@ Application: &ApplicationDefaults
       Rule: "ANY Endorsement"
   Capabilities:
     <<: *ApplicationCapabilities
+  ACLs:
+    # Discoveryサービスのアクセス制御ポリシー
+    peer/Discovery: /Channel/Application/Readers
 ################################################################################
 #
 #   SECTION: Orderer

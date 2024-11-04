@@ -1,8 +1,8 @@
 /*
- * Copyright IBM Corp. All Rights Reserved.
- *
- * SPDX-License-Identifier: Apache-2.0
- */
+* Copyright IBM Corp. All Rights Reserved.
+*
+* SPDX-License-Identifier: Apache-2.0
+*/
 
 import * as grpc from '@grpc/grpc-js';
 import { connect, Contract, Identity, Signer, signers } from '@hyperledger/fabric-gateway';
@@ -11,41 +11,76 @@ import { promises as fs } from 'fs';
 import * as path from 'path';
 import { TextDecoder } from 'util';
 
-const channelName = envOrDefault('CHANNEL_NAME', 'mychannel');
+    
+async function main(): Promise<void> {     
+    await setupOrg(1);  
+    await setupOrg(2);  
+    await setupOrg(3);  
+}
+interface Asset{
+    ID:             string,
+    Color:          string,
+    Size:           number,
+    Owner:          string,
+    AppraisedValue: number,
+}
+
+
+function channelName(org:number) { 
+    return envOrDefault('CHANNEL_NAME', `org${org}`);
+}
+
 const chaincodeName = envOrDefault('CHAINCODE_NAME', 'basic');
-const mspId = envOrDefault('MSP_ID', 'Org1MSP');
-
-// Path to crypto materials.
-const cryptoPath = envOrDefault('CRYPTO_PATH', path.resolve(__dirname, '..', '..', '..', 'test-network', 'organizations', 'peerOrganizations', 'org1.example.com'));
-
-// Path to user private key directory.
-const keyDirectoryPath = envOrDefault('KEY_DIRECTORY_PATH', path.resolve(cryptoPath, 'users', 'User1@org1.example.com', 'msp', 'keystore'));
-
-// Path to user certificate directory.
-const certDirectoryPath = envOrDefault('CERT_DIRECTORY_PATH', path.resolve(cryptoPath, 'users', 'User1@org1.example.com', 'msp', 'signcerts'));
-
-// Path to peer tls certificate.
-const tlsCertPath = envOrDefault('TLS_CERT_PATH', path.resolve(cryptoPath, 'peers', 'peer0.org1.example.com', 'tls', 'ca.crt'));
-
-// Gateway peer endpoint.
-const peerEndpoint = envOrDefault('PEER_ENDPOINT', 'localhost:7051');
-
-// Gateway peer SSL host name override.
-const peerHostAlias = envOrDefault('PEER_HOST_ALIAS', 'peer0.org1.example.com');
-
 const utf8Decoder = new TextDecoder();
 const assetId = `asset${String(Date.now())}`;
+function getMspId (org:number){
+    return envOrDefault('MSP_ID', `Org${org}MSP`);
+}
 
-async function main(): Promise<void> {
-    displayInputParameters();
 
-    // The gRPC client connection should be shared by all Gateway connections to this endpoint.
-    const client = await newGrpcConnection();
+// Path to crypto materials.
+function cryptoPath(org:number){
+    return  path.resolve(__dirname, '..', '..', '..', 'test-network', 'organizations', 'peerOrganizations', `org${org}.example.com`)
+}
 
-    const gateway = connect({
+
+// Path to user private key directory.
+function keyDirectoryPath(org:number){
+    return envOrDefault('KEY_DIRECTORY_PATH', path.resolve(cryptoPath(org), 'users', `User1@org${org}.example.com`, 'msp', 'keystore'))
+}
+
+
+// Path to user certificate directory.
+
+function certDirectoryPath(org:number){
+return envOrDefault('CERT_DIRECTORY_PATH', path.resolve(cryptoPath(org), 'users', `User1@org${org}.example.com`, 'msp', 'signcerts'));
+}
+// Path to peer tls certificate.
+function tlsCertPath(org:number){ return  envOrDefault('TLS_CERT_PATH', path.resolve(cryptoPath(org), 'peers', `peer0.org${org}.example.com`, 'tls', 'ca.crt'));
+}
+// Gateway peer endpoint.
+function peerEndpoint (org:number){
+    const port=(org-1)*2000+7051;
+    return envOrDefault('PEER_ENDPOINT', `localhost:${port}`);
+}
+
+// Gateway peer SSL host name override.
+function peerHostAlias(org:number) { 
+    return envOrDefault('PEER_HOST_ALIAS', `peer0.org${org}.example.com`);
+}
+
+
+
+
+
+async function setupOrg(orgNum:number): Promise<void> {
+    // displayInputParameters();
+    const client = await newGrpcConnection(orgNum);
+
+    const gateway=connect({
         client,
-        identity: await newIdentity(),
-        signer: await newSigner(),
+        identity: await newIdentity(orgNum),
+        signer: await newSigner(orgNum),
         // Default timeouts for different gRPC calls
         evaluateOptions: () => {
             return { deadline: Date.now() + 5000 }; // 5 seconds
@@ -58,16 +93,42 @@ async function main(): Promise<void> {
         },
         commitStatusOptions: () => {
             return { deadline: Date.now() + 60000 }; // 1 minute
-        },
-    });
+        },});
 
-    try {
-        // Get a network instance representing the channel where the smart contract is deployed.
-        const network = gateway.getNetwork(channelName);
-
+        // 5. リスナーを登録する
+        
+        try {
+        const network = gateway.getNetwork(channelName(orgNum));
+        
         // Get the smart contract from the network.
         const contract = network.getContract(chaincodeName);
 
+        // await contract.
+
+        console.log(`${orgNum}スタート`)
+        const events=await network.getChaincodeEvents(chaincodeName)
+        console.log("owari")
+
+    for await (const event of events) {
+    try {
+        console.log(`Event Name: ${event.transactionId}`);
+        
+        // イベントのペイロードをデコード
+        const payload = event.payload;
+        const asset = JSON.parse(new TextDecoder('utf-8').decode(payload)) as Asset;
+        console.log(`Asset ID: ${asset.ID}`);
+        
+        // mychannel の設定・送信
+        const myChannelNetwork = gateway.getNetwork('mychannel');
+        const myChannelContract = myChannelNetwork.getContract(chaincodeName);
+        
+        // アセットを作成
+        await createAsset(myChannelContract, asset);
+        console.log("アセット作成が完了しました");
+    } catch (eventError) {
+        console.error(`イベント処理中にエラーが発生しました: ${eventError}`);
+    }
+}
         // Initialize a set of asset data on the ledger using the chaincode 'InitLedger' function.
         await initLedger(contract);
 
@@ -75,7 +136,6 @@ async function main(): Promise<void> {
         await getAllAssets(contract);
 
         // Create a new asset on the ledger.
-        await createAsset(contract);
 
         // Update an existing asset asynchronously.
         await transferAssetAsync(contract);
@@ -85,28 +145,32 @@ async function main(): Promise<void> {
 
         // Update an asset which does not exist.
         await updateNonExistentAsset(contract)
-    } finally {
+    }catch (error) {
+        console.error(`Error listening for events: ${error}`);
+    } 
+    finally{
         gateway.close();
         client.close();
     }
-}
+    }
 
 main().catch((error: unknown) => {
     console.error('******** FAILED to run the application:', error);
     process.exitCode = 1;
 });
 
-async function newGrpcConnection(): Promise<grpc.Client> {
-    const tlsRootCert = await fs.readFile(tlsCertPath);
+async function newGrpcConnection(org:number): Promise<grpc.Client> {
+    const tlsRootCert = await fs.readFile(tlsCertPath(org));
     const tlsCredentials = grpc.credentials.createSsl(tlsRootCert);
-    return new grpc.Client(peerEndpoint, tlsCredentials, {
-        'grpc.ssl_target_name_override': peerHostAlias,
+    return new grpc.Client(peerEndpoint(org), tlsCredentials, {
+        'grpc.ssl_target_name_override': peerHostAlias(org),
     });
 }
 
-async function newIdentity(): Promise<Identity> {
-    const certPath = await getFirstDirFileName(certDirectoryPath);
+async function newIdentity(org:number): Promise<Identity> {
+    const certPath = await getFirstDirFileName(certDirectoryPath(org));
     const credentials = await fs.readFile(certPath);
+    const mspId=getMspId(org);
     return { mspId, credentials };
 }
 
@@ -119,8 +183,8 @@ async function getFirstDirFileName(dirPath: string): Promise<string> {
     return path.join(dirPath, file);
 }
 
-async function newSigner(): Promise<Signer> {
-    const keyPath = await getFirstDirFileName(keyDirectoryPath);
+async function newSigner(org:number): Promise<Signer> {
+    const keyPath = await getFirstDirFileName(keyDirectoryPath(org));
     const privateKeyPem = await fs.readFile(keyPath);
     const privateKey = crypto.createPrivateKey(privateKeyPem);
     return signers.newPrivateKeySigner(privateKey);
@@ -154,16 +218,16 @@ async function getAllAssets(contract: Contract): Promise<void> {
 /**
  * Submit a transaction synchronously, blocking until it has been committed to the ledger.
  */
-async function createAsset(contract: Contract): Promise<void> {
+async function createAsset(contract: Contract,asset:Asset): Promise<void> {
     console.log('\n--> Submit Transaction: CreateAsset, creates new asset with ID, Color, Size, Owner and AppraisedValue arguments');
 
     await contract.submitTransaction(
         'CreateAsset',
-        assetId,
-        'yellow',
-        '5',
-        'Tom',
-        '1300',
+        asset.ID,
+        asset.Color,
+        asset.Size.toString(),
+        asset.Owner,
+        asset.AppraisedValue.toString(),
     );
 
     console.log('*** Transaction committed successfully');
@@ -233,14 +297,14 @@ function envOrDefault(key: string, defaultValue: string): string {
 /**
  * displayInputParameters() will print the global scope parameters used by the main driver routine.
  */
-function displayInputParameters(): void {
-    console.log(`channelName:       ${channelName}`);
-    console.log(`chaincodeName:     ${chaincodeName}`);
-    console.log(`mspId:             ${mspId}`);
-    console.log(`cryptoPath:        ${cryptoPath}`);
-    console.log(`keyDirectoryPath:  ${keyDirectoryPath}`);
-    console.log(`certDirectoryPath: ${certDirectoryPath}`);
-    console.log(`tlsCertPath:       ${tlsCertPath}`);
-    console.log(`peerEndpoint:      ${peerEndpoint}`);
-    console.log(`peerHostAlias:     ${peerHostAlias}`);
-}
+// function displayInputParameters(): void {
+//     console.log(`channelName:       ${channelName}`);
+//     console.log(`chaincodeName:     ${chaincodeName}`);
+//     // console.log(`mspId:             ${mspId}`);
+//     console.log(`cryptoPath:        ${cryptoPath}`);
+//     console.log(`keyDirectoryPath:  ${keyDirectoryPath}`);
+//     console.log(`certDirectoryPath: ${certDirectoryPath}`);
+//     console.log(`tlsCertPath:       ${tlsCertPath}`);
+//     console.log(`peerEndpoint:      ${peerEndpoint}`);
+//     console.log(`peerHostAlias:     ${peerHostAlias}`);
+// }

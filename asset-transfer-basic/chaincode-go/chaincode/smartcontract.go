@@ -71,7 +71,19 @@ func (s *SmartContract) CreateAsset(ctx contractapi.TransactionContextInterface,
 		return err
 	}
 
-	return ctx.GetStub().PutState(id, assetJSON)
+		// アセットを台帳に保存
+		err = ctx.GetStub().PutState(id, assetJSON)
+		if err != nil {
+			return fmt.Errorf("failed to create asset: %v", err)
+		}
+	
+		// イベントを発行
+		err = ctx.GetStub().SetEvent("AssetCreated", assetJSON)
+		if err != nil {
+			return fmt.Errorf("failed to set event for asset creation: %v", err)
+		}
+	
+		return nil
 }
 
 // ReadAsset returns the asset stored in the world state with given id.

@@ -1,9 +1,12 @@
 #!/bin/bash
 
 ./network.sh down
-docker volume rm $(docker volume ls -q)docker volume rm $(docker volume ls -q)
+docker stop $(docker ps -q)
+docker rm $(docker ps -a -q)
+docker volume rm $(docker volume ls -q)
 
-./network.sh up
+
+./network.sh up -ca
 ./network.sh createChannel 
 ./network.sh createChannel -org 1 -c "org1" 
 ./network.sh createChannel -org 2 -c "org2" 
