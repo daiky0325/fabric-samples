@@ -150,30 +150,16 @@ createChannelGenesisBlock $BFT
 infoln "Creating channel ${CHANNEL_NAME}"
 createChannel $BFT
 successln "Channel '$CHANNEL_NAME' created"
-if [ $CHANNEL_ORG -eq 0 ];then
-  ## Join all the peers to the channel ここでチャネルに入る入らないを制御している
-  infoln "Joining org1 peer to the channel..."
-  joinChannel 1
-  infoln "Joining org2 peer to the channel..."
-  joinChannel 2
-  infoln "Joining org3 peer to the channel..."
-  joinChannel 3
 
-  ## Set the anchor peers for each org in the channel
-  infoln "Setting anchor peer for org1..."
-  setAnchorPeer 1
-  infoln "Setting anchor peer for org2..."
-  setAnchorPeer 2
-  infoln "Setting anchor peer for org3..."
-  setAnchorPeer 3
-else
-  infoln "Setting  for org$CHANNEL_ORG..."
-  joinOrganizationChannel $CHANNEL_ORG 0
-  joinOrganizationChannel $CHANNEL_ORG 1
-  joinOrganizationChannel $CHANNEL_ORG 2
-  joinOrganizationChannel $CHANNEL_ORG 3
- 
-  setAnchorPeer $CHANNEL_ORG 
-fi
+for orgNum in 1 2 3
+
+do
+  infoln "Setting  for org$orgNum..."
+  joinOrganizationChannel $orgNum 0
+  joinOrganizationChannel $orgNum 1
+  joinOrganizationChannel $orgNum 2
+  joinOrganizationChannel $orgNum 3
+  setAnchorPeer $orgNum 
+done
 
 successln "Channel '$CHANNEL_NAME' joined"

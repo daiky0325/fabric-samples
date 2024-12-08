@@ -74,57 +74,19 @@ checkPrereqs
 
 PACKAGE_ID=$(peer lifecycle chaincode calculatepackageid ${CC_NAME}.tar.gz)
 
-if [ $CHANNEL_ORG -eq 0 ];then
 
-## Install chaincode on peer0.org1 and peer0.org2
-infoln "Installing chaincode on peer0.org1..."
-installChaincode 1
-infoln "Install chaincode on peer0.org2..."
-installChaincode 2
-infoln "Install chaincode on peer0.org3..."
-installChaincode 3
-
-resolveSequence
-
-## query whether the chaincode is installed オンリー確認
-queryInstalled 1
-
-## approve the definition for org1
-approveForMyOrg 1
-
-## check whether the chaincode definition is ready to be committed
-## expect org1 to have approved and org2 not to
-checkCommitReadiness 1 "\"Org1MSP\": true" "\"Org2MSP\": false"
-checkCommitReadiness 2 "\"Org1MSP\": true" "\"Org2MSP\": false"
-
-## now approve also for org2
-approveForMyOrg 2
-
-## check whether the chaincode definition is ready to be committed
-## expect them both to have approved
-checkCommitReadiness 1 "\"Org1MSP\": true" "\"Org2MSP\": true"
-checkCommitReadiness 2 "\"Org1MSP\": true" "\"Org2MSP\": true"
-
-approveForMyOrg 3
-
-## now that we know for sure both orgs have approved, commit the definition
-commitChaincodeDefinition 1 2 3
-
-## query on both orgs to see that the definition committed successfully
-queryCommitted 1
-queryCommitted 2
-queryCommitted 3
-
-else
-installOrganizationChaincode $CHANNEL_ORG 0
-installOrganizationChaincode $CHANNEL_ORG 1
-installOrganizationChaincode $CHANNEL_ORG 2
-installOrganizationChaincode $CHANNEL_ORG 3
+for orgNum in 1 2 3
+do 
+installOrganizationChaincode $orgNum 0
+installOrganizationChaincode $orgNum 1
+installOrganizationChaincode $orgNum 2
+installOrganizationChaincode $orgNum 3
 resolveSequence
 #代表するピア一つのみ
-approveForMyOrg $CHANNEL_ORG
-commitChaincodeDefinition $CHANNEL_ORG
-fi
+approveForMyOrg $orgNum
+done
+commitChaincodeDefinition 1 2 3
+
 ## Invoke the chaincode - this does require that the chaincode have the 'initLedger'
 ## method defined
 if [ "$CC_INIT_FCN" = "NA" ]; then
